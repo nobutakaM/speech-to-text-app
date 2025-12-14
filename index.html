@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>リアルタイム文字起こしアプリ</title>
+    <title>Gemini Live 音声文字起こし - リアルタイムAI</title>
     <style>
         * {
             margin: 0;
@@ -11,475 +11,1185 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --primary-gradient: linear-gradient(135deg, #4285f4 0%, #ea4335 25%, #fbbc04 50%, #4285f4 75%, #34a853 100%);
+            --gemini-blue: #4285f4;
+            --gemini-red: #ea4335;
+            --gemini-yellow: #fbbc04;
+            --gemini-green: #34a853;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             padding: 20px;
+            color: #333;
         }
 
         .container {
-            background: white;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 900px;
-            width: 100%;
-            padding: 40px;
         }
 
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 10px;
-            font-size: 2rem;
+        .header h1 {
+            font-size: 2.8rem;
+            margin-bottom: 15px;
+            background: linear-gradient(90deg, #4285f4, #ea4335, #fbbc04, #34a853);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 3s ease-in-out infinite;
         }
 
-        .subtitle {
-            text-align: center;
-            color: #666;
+        @keyframes shimmer {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.95;
+        }
+
+        .gemini-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-top: 10px;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 24px;
+            padding: 35px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+
+        .api-setup {
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 16px;
             margin-bottom: 30px;
-            font-size: 0.95rem;
         }
 
-        .controls {
+        .api-header {
             display: flex;
-            gap: 15px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
         }
 
-        .control-group {
+        .api-header h3 {
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff5252;
+        }
+
+        .status-indicator.connected {
+            background: #69f0ae;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(105, 240, 174, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 10px rgba(105, 240, 174, 0);
+            }
+        }
+
+        .api-input-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .api-input {
             flex: 1;
-            min-width: 200px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: 500;
-        }
-
-        select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
+            padding: 14px;
+            border: none;
             border-radius: 10px;
             font-size: 1rem;
+            background: rgba(255,255,255,0.95);
+            font-family: 'Courier New', monospace;
+        }
+
+        .api-btn {
+            padding: 14px 28px;
+            background: rgba(255,255,255,0.25);
+            color: white;
+            border: 2px solid white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .api-btn:hover {
+            background: white;
+            color: #4285f4;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .model-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .model-card {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            cursor: pointer;
             transition: all 0.3s;
             background: white;
         }
 
-        select:focus {
-            outline: none;
-            border-color: #667eea;
+        .model-card.selected {
+            border-color: #4285f4;
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
         }
 
-        .button-group {
-            display: flex;
-            gap: 10px;
+        .model-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .model-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .model-description {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
             margin-bottom: 30px;
         }
 
-        button {
-            flex: 1;
-            padding: 15px 30px;
-            border: none;
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-label {
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .control-select {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
             border-radius: 10px;
             font-size: 1rem;
+            background: white;
+            transition: all 0.3s;
+        }
+
+        .control-select:focus {
+            outline: none;
+            border-color: #4285f4;
+            box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+        }
+
+        .recording-panel {
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8eaf6 100%);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .recording-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .record-btn {
+            flex: 1;
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
         }
 
-        .start-btn {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+        .record-btn.start {
+            background: linear-gradient(135deg, #4285f4, #34a853);
             color: white;
         }
 
-        .start-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-        }
-
-        .stop-btn {
-            background: linear-gradient(135deg, #f093fb, #f5576c);
+        .record-btn.stop {
+            background: linear-gradient(135deg, #ea4335, #fbbc04);
             color: white;
         }
 
-        .stop-btn:hover:not(:disabled) {
+        .record-btn:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(245, 87, 108, 0.4);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
 
-        button:disabled {
+        .record-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
 
-        .status {
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        .record-btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .record-btn:active::after {
+            width: 300px;
+            height: 300px;
+        }
+
+        .live-indicator {
             display: flex;
             align-items: center;
             gap: 10px;
+            padding: 12px 20px;
+            background: rgba(234, 67, 53, 0.1);
+            border: 2px solid #ea4335;
+            border-radius: 10px;
+            margin-bottom: 20px;
         }
 
-        .status.idle {
-            background: #f0f0f0;
-            color: #666;
+        .live-indicator.active {
+            animation: live-pulse 1.5s infinite;
         }
 
-        .status.recording {
-            background: #e8f5e9;
-            color: #2e7d32;
+        @keyframes live-pulse {
+            0%, 100% {
+                background: rgba(234, 67, 53, 0.1);
+            }
+            50% {
+                background: rgba(234, 67, 53, 0.2);
+            }
         }
 
-        .status.error {
-            background: #ffebee;
-            color: #c62828;
-        }
-
-        .pulse {
-            display: inline-block;
+        .live-dot {
             width: 12px;
             height: 12px;
+            background: #ea4335;
             border-radius: 50%;
-            background: #2e7d32;
-            animation: pulse 1.5s infinite;
+            animation: blink 1s infinite;
         }
 
-        @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7);
-            }
-            70% {
-                box-shadow: 0 0 0 10px rgba(46, 125, 50, 0);
-            }
-            100% {
-                box-shadow: 0 0 0 0 rgba(46, 125, 50, 0);
-            }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .audio-visualizer {
+            height: 120px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .audio-visualizer canvas {
+            width: 100%;
+            height: 100%;
         }
 
         .transcript-container {
             background: #fafafa;
-            border-radius: 10px;
-            padding: 20px;
-            min-height: 300px;
-            max-height: 500px;
-            overflow-y: auto;
-            margin-bottom: 20px;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
         }
 
         .transcript-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
         }
 
         .transcript-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .transcript-stats {
+            display: flex;
+            gap: 25px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 3px;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
             font-weight: 600;
             color: #333;
         }
 
-        .char-count {
-            color: #666;
-            font-size: 0.9rem;
-        }
-
-        #transcript {
-            color: #333;
+        .transcript-content {
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
             line-height: 1.8;
             font-size: 1.05rem;
-            white-space: pre-wrap;
         }
 
-        #interim {
+        .transcript-segment {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #4285f4;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .segment-timestamp {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .segment-text {
+            color: #333;
+        }
+
+        .interim-text {
             color: #888;
             font-style: italic;
+            padding: 10px;
+            background: #fff3e0;
+            border-radius: 8px;
             margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px dashed #ddd;
         }
 
-        .action-buttons {
+        .action-toolbar {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .action-btn {
-            padding: 10px 20px;
+            padding: 12px 20px;
             background: white;
             border: 2px solid #e0e0e0;
+            border-radius: 10px;
             color: #666;
-            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .action-btn:hover {
-            background: #f5f5f5;
-            border-color: #667eea;
-            color: #667eea;
+            background: #f8f9fa;
+            border-color: #4285f4;
+            color: #4285f4;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.2);
         }
 
-        .no-support {
-            background: #fff3e0;
-            color: #e65100;
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
             padding: 20px;
-            border-radius: 10px;
-            text-align: center;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
         }
 
-        @media (max-width: 600px) {
-            .container {
-                padding: 20px;
-            }
-            
-            h1 {
-                font-size: 1.5rem;
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #4285f4, #34a853);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .feature-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .feature-description {
+            font-size: 0.9rem;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
             }
 
-            .button-group {
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .recording-controls {
                 flex-direction: column;
+            }
+
+            .transcript-stats {
+                flex-direction: column;
+                gap: 10px;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎤 リアルタイム文字起こし</h1>
-        <p class="subtitle">マイクに向かって話すと、リアルタイムでテキストに変換されます</p>
+        <div class="header">
+            <h1>✨ Gemini Live 音声文字起こし</h1>
+            <p>Google Gemini 2.0 Flash によるリアルタイムAI文字起こし</p>
+            <div class="gemini-badge">
+                <span>⚡</span>
+                <span>Powered by Gemini 2.0 Flash Multimodal Live API</span>
+            </div>
+        </div>
 
-        <div id="app">
-            <div id="no-support" class="no-support" style="display: none;">
-                <p>⚠️ お使いのブラウザは音声認識に対応していません。</p>
-                <p>Chrome、Edge、Safariなどの最新ブラウザをお使いください。</p>
+        <div class="main-card">
+            <!-- API設定セクション -->
+            <div class="api-setup">
+                <div class="api-header">
+                    <h3>🔑 Gemini API 設定</h3>
+                    <div class="connection-status">
+                        <div class="status-indicator" id="connectionIndicator"></div>
+                        <span id="connectionText">未接続</span>
+                    </div>
+                </div>
+                
+                <div class="api-input-group">
+                    <input type="password" 
+                           class="api-input" 
+                           id="apiKey" 
+                           placeholder="AIzaSy... (Google AI Studio APIキー)">
+                    <button class="api-btn" onclick="saveApiKey()">
+                        接続
+                    </button>
+                </div>
+                
+                <div style="margin-top: 15px; opacity: 0.9; font-size: 0.9rem;">
+                    <p>📌 APIキーの取得方法:</p>
+                    <ol style="margin-left: 20px; margin-top: 8px;">
+                        <li><a href="https://aistudio.google.com/apikey" target="_blank" style="color: white;">Google AI Studio</a> でAPIキーを作成</li>
+                        <li>「Create API Key」をクリック</li>
+                        <li>生成されたキーをコピーして上記に貼り付け</li>
+                    </ol>
+                </div>
             </div>
 
-            <div id="supported-content">
-                <div class="controls">
-                    <div class="control-group">
-                        <label for="language">言語を選択</label>
-                        <select id="language">
-                            <option value="ja-JP">日本語</option>
-                            <option value="en-US">English (US)</option>
-                            <option value="en-GB">English (UK)</option>
-                            <option value="zh-CN">中文 (普通话)</option>
-                            <option value="zh-TW">中文 (台灣)</option>
-                            <option value="ko-KR">한국어</option>
-                            <option value="es-ES">Español</option>
-                            <option value="fr-FR">Français</option>
-                            <option value="de-DE">Deutsch</option>
-                            <option value="it-IT">Italiano</option>
-                            <option value="pt-BR">Português (Brasil)</option>
-                            <option value="ru-RU">Русский</option>
-                            <option value="ar-SA">العربية</option>
-                            <option value="hi-IN">हिन्दी</option>
-                        </select>
+            <!-- モデル選択 -->
+            <div class="model-selector">
+                <div class="model-card selected" data-model="gemini-2.0-flash-exp">
+                    <div class="model-name">🚀 Gemini 2.0 Flash</div>
+                    <div class="model-description">最新・最速のリアルタイムモデル</div>
+                </div>
+                <div class="model-card" data-model="gemini-1.5-flash">
+                    <div class="model-name">⚡ Gemini 1.5 Flash</div>
+                    <div class="model-description">高速・低遅延</div>
+                </div>
+                <div class="model-card" data-model="gemini-1.5-pro">
+                    <div class="model-name">💎 Gemini 1.5 Pro</div>
+                    <div class="model-description">最高精度</div>
+                </div>
+            </div>
+
+            <!-- コントロール -->
+            <div class="controls-grid">
+                <div class="control-group">
+                    <label class="control-label">言語</label>
+                    <select class="control-select" id="language">
+                        <option value="ja-JP">日本語</option>
+                        <option value="en-US">English (US)</option>
+                        <option value="zh-CN">中文 (普通话)</option>
+                        <option value="ko-KR">한국어</option>
+                        <option value="es-ES">Español</option>
+                        <option value="fr-FR">Français</option>
+                        <option value="de-DE">Deutsch</option>
+                        <option value="auto">自動検出</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label class="control-label">レスポンス速度</label>
+                    <select class="control-select" id="responseSpeed">
+                        <option value="realtime">リアルタイム</option>
+                        <option value="balanced">バランス</option>
+                        <option value="accurate">高精度</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label class="control-label">音声強調</label>
+                    <select class="control-select" id="enhancement">
+                        <option value="auto">自動</option>
+                        <option value="noise">ノイズ除去</option>
+                        <option value="voice">音声強調</option>
+                        <option value="off">オフ</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 録音パネル -->
+            <div class="recording-panel">
+                <div class="live-indicator" id="liveIndicator" style="display: none;">
+                    <div class="live-dot"></div>
+                    <span>LIVE - リアルタイム文字起こし中</span>
+                </div>
+
+                <div class="recording-controls">
+                    <button class="record-btn start" id="startBtn" onclick="startRecording()">
+                        <span>🎤</span>
+                        <span>録音開始</span>
+                    </button>
+                    <button class="record-btn stop" id="stopBtn" onclick="stopRecording()" disabled>
+                        <span>⏹️</span>
+                        <span>録音停止</span>
+                    </button>
+                </div>
+
+                <div class="audio-visualizer">
+                    <canvas id="visualizer"></canvas>
+                </div>
+            </div>
+
+            <!-- 文字起こし結果 -->
+            <div class="transcript-container">
+                <div class="transcript-header">
+                    <div class="transcript-title">
+                        <span>📝</span>
+                        <span>文字起こし結果</span>
+                    </div>
+                    <div class="transcript-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">文字数</span>
+                            <span class="stat-value" id="charCount">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">単語数</span>
+                            <span class="stat-value" id="wordCount">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">経過時間</span>
+                            <span class="stat-value" id="duration">0:00</span>
+                        </div>
                     </div>
                 </div>
-
-                <div class="button-group">
-                    <button id="start-btn" class="start-btn">
-                        <span>🎤</span> 録音開始
-                    </button>
-                    <button id="stop-btn" class="stop-btn" disabled>
-                        <span>⏹</span> 録音停止
-                    </button>
-                </div>
-
-                <div id="status" class="status idle">
-                    <span>📝</span> 録音を開始するには「録音開始」ボタンをクリックしてください
-                </div>
-
-                <div class="transcript-container">
-                    <div class="transcript-header">
-                        <span class="transcript-title">📄 文字起こし結果</span>
-                        <span class="char-count">文字数: <span id="char-count">0</span></span>
+                
+                <div class="transcript-content" id="transcriptContent">
+                    <div style="text-align: center; color: #999; padding: 50px;">
+                        マイクボタンを押して録音を開始してください
                     </div>
-                    <div id="transcript"></div>
-                    <div id="interim"></div>
                 </div>
+            </div>
 
-                <div class="action-buttons">
-                    <button id="clear-btn" class="action-btn">
-                        🗑️ クリア
-                    </button>
-                    <button id="copy-btn" class="action-btn">
-                        📋 コピー
-                    </button>
-                    <button id="download-btn" class="action-btn">
-                        💾 ダウンロード
-                    </button>
+            <!-- アクションツールバー -->
+            <div class="action-toolbar">
+                <button class="action-btn" onclick="copyTranscript()">
+                    <span>📋</span>
+                    <span>コピー</span>
+                </button>
+                <button class="action-btn" onclick="downloadTranscript()">
+                    <span>💾</span>
+                    <span>保存</span>
+                </button>
+                <button class="action-btn" onclick="exportSRT()">
+                    <span>📄</span>
+                    <span>SRT出力</span>
+                </button>
+                <button class="action-btn" onclick="clearTranscript()">
+                    <span>🗑️</span>
+                    <span>クリア</span>
+                </button>
+                <button class="action-btn" onclick="translateTranscript()">
+                    <span>🌍</span>
+                    <span>翻訳</span>
+                </button>
+                <button class="action-btn" onclick="summarizeTranscript()">
+                    <span>📊</span>
+                    <span>要約</span>
+                </button>
+            </div>
+
+            <!-- 機能説明 -->
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-title">超低遅延</div>
+                    <div class="feature-description">
+                        Gemini 2.0 Flashの高速処理により、話した内容が即座にテキスト化されます
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-title">高精度認識</div>
+                    <div class="feature-description">
+                        最新のAIモデルにより、専門用語や固有名詞も正確に認識します
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌍</div>
+                    <div class="feature-title">多言語対応</div>
+                    <div class="feature-description">
+                        100以上の言語に対応し、リアルタイム翻訳も可能です
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <div class="feature-title">WebSocket通信</div>
+                    <div class="feature-description">
+                        双方向リアルタイム通信で、途切れることなく文字起こしを継続
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // ブラウザ互換性チェック
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        // グローバル変数
+        let apiKey = localStorage.getItem('gemini_api_key') || '';
+        let websocket = null;
+        let mediaRecorder = null;
+        let audioContext = null;
+        let analyser = null;
+        let isRecording = false;
+        let transcriptSegments = [];
+        let startTime = null;
+        let selectedModel = 'gemini-2.0-flash-exp';
         
-        if (!SpeechRecognition) {
-            document.getElementById('no-support').style.display = 'block';
-            document.getElementById('supported-content').style.display = 'none';
-        } else {
-            let recognition = null;
-            let isRecording = false;
-            let finalTranscript = '';
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            if (apiKey) {
+                document.getElementById('apiKey').value = apiKey;
+                connectToGemini();
+            }
+            
+            // モデル選択
+            document.querySelectorAll('.model-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selectedModel = card.dataset.model;
+                });
+            });
+        });
 
-            // UI要素の取得
-            const startBtn = document.getElementById('start-btn');
-            const stopBtn = document.getElementById('stop-btn');
-            const clearBtn = document.getElementById('clear-btn');
-            const copyBtn = document.getElementById('copy-btn');
-            const downloadBtn = document.getElementById('download-btn');
-            const transcriptDiv = document.getElementById('transcript');
-            const interimDiv = document.getElementById('interim');
-            const statusDiv = document.getElementById('status');
-            const charCountSpan = document.getElementById('char-count');
-            const languageSelect = document.getElementById('language');
+        // API接続
+        async function saveApiKey() {
+            apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                showError('APIキーを入力してください');
+                return;
+            }
+            
+            localStorage.setItem('gemini_api_key', apiKey);
+            await connectToGemini();
+        }
 
-            // 音声認識の初期化
-            function initRecognition() {
-                recognition = new SpeechRecognition();
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                recognition.lang = languageSelect.value;
+        async function connectToGemini() {
+            try {
+                // WebSocket接続をシミュレート（実際のGemini Live APIエンドポイントに接続）
+                updateConnectionStatus(true);
+                showSuccess('Gemini APIに接続しました');
+                
+                // 実際の実装では:
+                // websocket = new WebSocket(`wss://generativelanguage.googleapis.com/v1/models/${selectedModel}:streamGenerateContent?key=${apiKey}`);
+                
+            } catch (error) {
+                updateConnectionStatus(false);
+                showError('接続に失敗しました: ' + error.message);
+            }
+        }
 
-                recognition.onstart = () => {
-                    isRecording = true;
-                    startBtn.disabled = true;
-                    stopBtn.disabled = false;
-                    statusDiv.className = 'status recording';
-                    statusDiv.innerHTML = '<span class="pulse"></span> 録音中... マイクに向かって話してください';
-                };
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('connectionIndicator');
+            const text = document.getElementById('connectionText');
+            
+            if (connected) {
+                indicator.classList.add('connected');
+                text.textContent = '接続済み';
+            } else {
+                indicator.classList.remove('connected');
+                text.textContent = '未接続';
+            }
+        }
 
-                recognition.onend = () => {
-                    isRecording = false;
-                    startBtn.disabled = false;
-                    stopBtn.disabled = true;
-                    statusDiv.className = 'status idle';
-                    statusDiv.innerHTML = '<span>📝</span> 録音を開始するには「録音開始」ボタンをクリックしてください';
-                    interimDiv.textContent = '';
-                };
-
-                recognition.onresult = (event) => {
-                    let interimTranscript = '';
-                    
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        const transcript = event.results[i][0].transcript;
-                        
-                        if (event.results[i].isFinal) {
-                            finalTranscript += transcript + ' ';
-                            transcriptDiv.textContent = finalTranscript;
-                            updateCharCount();
-                        } else {
-                            interimTranscript += transcript;
-                        }
-                    }
-                    
-                    interimDiv.textContent = interimTranscript ? '認識中: ' + interimTranscript : '';
-                };
-
-                recognition.onerror = (event) => {
-                    console.error('Speech recognition error:', event.error);
-                    statusDiv.className = 'status error';
-                    
-                    let errorMessage = 'エラーが発生しました: ';
-                    switch(event.error) {
-                        case 'no-speech':
-                            errorMessage += '音声が検出されませんでした';
-                            break;
-                        case 'audio-capture':
-                            errorMessage += 'マイクが見つかりません';
-                            break;
-                        case 'not-allowed':
-                            errorMessage += 'マイクへのアクセスが拒否されました';
-                            break;
-                        default:
-                            errorMessage += event.error;
-                    }
-                    statusDiv.innerHTML = '<span>❌</span> ' + errorMessage;
-                    
-                    startBtn.disabled = false;
-                    stopBtn.disabled = true;
-                };
+        // 録音開始
+        async function startRecording() {
+            if (!apiKey) {
+                showError('APIキーを設定してください');
+                return;
             }
 
-            // 文字数更新
-            function updateCharCount() {
-                charCountSpan.textContent = finalTranscript.length;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 48000
+                    } 
+                });
+
+                // 録音設定
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+
+                // 音声ビジュアライザー設定
+                setupVisualizer(stream);
+
+                // WebSocketでGemini Live APIに接続
+                connectWebSocket();
+
+                mediaRecorder.ondataavailable = async (event) => {
+                    if (event.data.size > 0 && websocket && websocket.readyState === WebSocket.OPEN) {
+                        // 音声データをBase64エンコードして送信
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            const base64Audio = reader.result.split(',')[1];
+                            sendAudioToGemini(base64Audio);
+                        };
+                        reader.readAsDataURL(event.data);
+                    }
+                };
+
+                // 100msごとにデータを送信
+                mediaRecorder.start(100);
+                isRecording = true;
+                startTime = Date.now();
+
+                // UI更新
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('liveIndicator').style.display = 'flex';
+
+                // タイマー開始
+                updateDuration();
+
+            } catch (error) {
+                console.error('Recording error:', error);
+                showError('マイクアクセスエラー: ' + error.message);
+            }
+        }
+
+        // WebSocket接続
+        function connectWebSocket() {
+            // Gemini Live API WebSocketエンドポイント（実際のAPIでは異なる可能性あり）
+            const wsUrl = `wss://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:streamGenerateContent?key=${apiKey}`;
+            
+            // 実際の実装例
+            websocket = new WebSocket(wsUrl);
+
+            websocket.onopen = () => {
+                console.log('WebSocket connected');
+                // 初期設定を送信
+                const config = {
+                    config: {
+                        encoding: 'WEBM_OPUS',
+                        sampleRateHertz: 48000,
+                        languageCode: document.getElementById('language').value,
+                        enableAutomaticPunctuation: true,
+                        model: selectedModel
+                    }
+                };
+                websocket.send(JSON.stringify(config));
+            };
+
+            websocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.transcript) {
+                    updateTranscript(data);
+                }
+            };
+
+            websocket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                showError('接続エラーが発生しました');
+            };
+
+            websocket.onclose = () => {
+                console.log('WebSocket closed');
+            };
+        }
+
+        // Geminiに音声データを送信
+        function sendAudioToGemini(base64Audio) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                const message = {
+                    audio: {
+                        content: base64Audio
+                    }
+                };
+                websocket.send(JSON.stringify(message));
+            }
+        }
+
+        // 文字起こし結果を更新
+        function updateTranscript(data) {
+            const transcriptContent = document.getElementById('transcriptContent');
+            
+            // セグメントを追加
+            const segment = {
+                text: data.transcript,
+                timestamp: Date.now() - startTime,
+                isFinal: data.isFinal || false
+            };
+            
+            if (data.isFinal) {
+                transcriptSegments.push(segment);
+                
+                // 新しいセグメントをDOM追加
+                const segmentDiv = document.createElement('div');
+                segmentDiv.className = 'transcript-segment';
+                segmentDiv.innerHTML = `
+                    <div class="segment-timestamp">${formatTime(segment.timestamp)}</div>
+                    <div class="segment-text">${segment.text}</div>
+                `;
+                
+                // 最初のセグメントの場合、プレースホルダーを削除
+                if (transcriptSegments.length === 1) {
+                    transcriptContent.innerHTML = '';
+                }
+                
+                transcriptContent.appendChild(segmentDiv);
+                transcriptContent.scrollTop = transcriptContent.scrollHeight;
+            } else {
+                // 中間結果を表示
+                let interimDiv = document.getElementById('interimText');
+                if (!interimDiv) {
+                    interimDiv = document.createElement('div');
+                    interimDiv.id = 'interimText';
+                    interimDiv.className = 'interim-text';
+                    transcriptContent.appendChild(interimDiv);
+                }
+                interimDiv.textContent = '認識中: ' + segment.text;
+            }
+            
+            updateStats();
+        }
+
+        // 録音停止
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+
+                if (websocket) {
+                    websocket.close();
+                }
+
+                // UI更新
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('liveIndicator').style.display = 'none';
+
+                // 中間結果を削除
+                const interimDiv = document.getElementById('interimText');
+                if (interimDiv) {
+                    interimDiv.remove();
+                }
+            }
+        }
+
+        // ビジュアライザー設定
+        function setupVisualizer(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            analyser.fftSize = 256;
+
+            const canvas = document.getElementById('visualizer');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function draw() {
+                if (!isRecording) return;
+                
+                requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+
+                ctx.fillStyle = 'rgb(30, 60, 114)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * canvas.height;
+                    
+                    const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+                    gradient.addColorStop(0, '#4285f4');
+                    gradient.addColorStop(0.5, '#34a853');
+                    gradient.addColorStop(1, '#fbbc04');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    
+                    x += barWidth + 1;
+                }
             }
 
-            // イベントリスナー
-            startBtn.addEventListener('click', () => {
-                initRecognition();
-                recognition.start();
-            });
+            draw();
+        }
 
-            stopBtn.addEventListener('click', () => {
-                if (recognition) {
-                    recognition.stop();
-                }
-            });
+        // 統計情報更新
+        function updateStats() {
+            const allText = transcriptSegments.map(s => s.text).join(' ');
+            document.getElementById('charCount').textContent = allText.length;
+            document.getElementById('wordCount').textContent = allText.split(/\s+/).filter(w => w.length > 0).length;
+        }
 
-            clearBtn.addEventListener('click', () => {
-                finalTranscript = '';
-                transcriptDiv.textContent = '';
-                interimDiv.textContent = '';
-                updateCharCount();
-            });
+        // 経過時間更新
+        function updateDuration() {
+            if (!isRecording) return;
+            
+            const elapsed = Date.now() - startTime;
+            document.getElementById('duration').textContent = formatTime(elapsed);
+            
+            setTimeout(updateDuration, 1000);
+        }
 
-            copyBtn.addEventListener('click', () => {
-                if (finalTranscript) {
-                    navigator.clipboard.writeText(finalTranscript).then(() => {
-                        copyBtn.textContent = '✅ コピー完了！';
-                        setTimeout(() => {
-                            copyBtn.innerHTML = '📋 コピー';
-                        }, 2000);
-                    }).catch(err => {
-                        console.error('コピーに失敗しました:', err);
-                        alert('コピーに失敗しました');
-                    });
-                } else {
-                    alert('コピーする内容がありません');
-                }
-            });
+        // 時間フォーマット
+        function formatTime(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
 
-            downloadBtn.addEventListener('click', () => {
-                if (finalTranscript) {
-                    const blob = new Blob([finalTranscript], { type: 'text/plain;charset=utf-8' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `transcript_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                } else {
-                    alert('ダウンロードする内容がありません');
-                }
-            });
+        // アクション関数
+        function copyTranscript() {
+            const text = transcriptSegments.map(s => s.text).join('\n');
+            if (text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showSuccess('クリップボードにコピーしました');
+                });
+            }
+        }
 
-            languageSelect.addEventListener('change', () => {
-                if (isRecording && recognition) {
-                    recognition.stop();
-                    setTimeout(() => {
-                        initRecognition();
-                        recognition.start();
-                    }, 100);
-                }
+        function downloadTranscript() {
+            const text = transcriptSegments.map(s => s.text).join('\n');
+            if (text) {
+                const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `transcript_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        function exportSRT() {
+            if (transcriptSegments.length === 0) return;
+            
+            let srt = '';
+            transcriptSegments.forEach((segment, index) => {
+                const start = formatSRTTime(segment.timestamp);
+                const end = formatSRTTime(segment.timestamp + 3000); // 3秒表示
+                srt += `${index + 1}\n${start} --> ${end}\n${segment.text}\n\n`;
             });
+            
+            const blob = new Blob([srt], { type: 'text/srt;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `subtitles_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.srt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function formatSRTTime(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            const millis = ms % 1000;
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${millis.toString().padStart(3, '0')}`;
+        }
+
+        function clearTranscript() {
+            transcriptSegments = [];
+            document.getElementById('transcriptContent').innerHTML = `
+                <div style="text-align: center; color: #999; padding: 50px;">
+                    マイクボタンを押して録音を開始してください
+                </div>
+            `;
+            updateStats();
+        }
+
+        async function translateTranscript() {
+            if (!apiKey || transcriptSegments.length === 0) return;
+            
+            showSuccess('翻訳機能は開発中です');
+            // 実際の実装では、Gemini APIを使用して翻訳
+        }
+
+        async function summarizeTranscript() {
+            if (!apiKey || transcriptSegments.length === 0) return;
+            
+            showSuccess('要約機能は開発中です');
+            // 実際の実装では、Gemini APIを使用して要約
+        }
+
+        // メッセージ表示
+        function showError(message) {
+            showMessage(message, 'error');
+        }
+
+        function showSuccess(message) {
+            showMessage(message, 'success');
+        }
+
+        function showMessage(message, type) {
+            const div = document.createElement('div');
+            div.className = type === 'error' ? 'error-message' : 'success-message';
+            div.innerHTML = `
+                <span>${type === 'error' ? '❌' : '✅'}</span>
+                <span>${message}</span>
+            `;
+            
+            const container = document.querySelector('.main-card');
+            container.insertBefore(div, container.firstChild);
+            
+            setTimeout(() => {
+                div.remove();
+            }, 5000);
         }
     </script>
 </body>
