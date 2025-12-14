@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>リアルタイム文字起こしアプリ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .start-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .start-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .stop-btn {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+        }
+
+        .stop-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(245, 87, 108, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status.idle {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .status.recording {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .pulse {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #2e7d32;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(46, 125, 50, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(46, 125, 50, 0);
+            }
+        }
+
+        .transcript-container {
+            background: #fafafa;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .transcript-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .transcript-title {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .char-count {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        #transcript {
+            color: #333;
+            line-height: 1.8;
+            font-size: 1.05rem;
+            white-space: pre-wrap;
+        }
+
+        #interim {
+            color: #888;
+            font-style: italic;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #ddd;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .action-btn:hover {
+            background: #f5f5f5;
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .no-support {
+            background: #fff3e0;
+            color: #e65100;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 リアルタイム文字起こし</h1>
+        <p class="subtitle">マイクに向かって話すと、リアルタイムでテキストに変換されます</p>
+
+        <div id="app">
+            <div id="no-support" class="no-support" style="display: none;">
+                <p>⚠️ お使いのブラウザは音声認識に対応していません。</p>
+                <p>Chrome、Edge、Safariなどの最新ブラウザをお使いください。</p>
+            </div>
+
+            <div id="supported-content">
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="language">言語を選択</label>
+                        <select id="language">
+                            <option value="ja-JP">日本語</option>
+                            <option value="en-US">English (US)</option>
+                            <option value="en-GB">English (UK)</option>
+                            <option value="zh-CN">中文 (普通话)</option>
+                            <option value="zh-TW">中文 (台灣)</option>
+                            <option value="ko-KR">한국어</option>
+                            <option value="es-ES">Español</option>
+                            <option value="fr-FR">Français</option>
+                            <option value="de-DE">Deutsch</option>
+                            <option value="it-IT">Italiano</option>
+                            <option value="pt-BR">Português (Brasil)</option>
+                            <option value="ru-RU">Русский</option>
+                            <option value="ar-SA">العربية</option>
+                            <option value="hi-IN">हिन्दी</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button id="start-btn" class="start-btn">
+                        <span>🎤</span> 録音開始
+                    </button>
+                    <button id="stop-btn" class="stop-btn" disabled>
+                        <span>⏹</span> 録音停止
+                    </button>
+                </div>
+
+                <div id="status" class="status idle">
+                    <span>📝</span> 録音を開始するには「録音開始」ボタンをクリックしてください
+                </div>
+
+                <div class="transcript-container">
+                    <div class="transcript-header">
+                        <span class="transcript-title">📄 文字起こし結果</span>
+                        <span class="char-count">文字数: <span id="char-count">0</span></span>
+                    </div>
+                    <div id="transcript"></div>
+                    <div id="interim"></div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="clear-btn" class="action-btn">
+                        🗑️ クリア
+                    </button>
+                    <button id="copy-btn" class="action-btn">
+                        📋 コピー
+                    </button>
+                    <button id="download-btn" class="action-btn">
+                        💾 ダウンロード
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ブラウザ互換性チェック
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            document.getElementById('no-support').style.display = 'block';
+            document.getElementById('supported-content').style.display = 'none';
+        } else {
+            let recognition = null;
+            let isRecording = false;
+            let finalTranscript = '';
+
+            // UI要素の取得
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const copyBtn = document.getElementById('copy-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const transcriptDiv = document.getElementById('transcript');
+            const interimDiv = document.getElementById('interim');
+            const statusDiv = document.getElementById('status');
+            const charCountSpan = document.getElementById('char-count');
+            const languageSelect = document.getElementById('language');
+
+            // 音声認識の初期化
+            function initRecognition() {
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = languageSelect.value;
+
+                recognition.onstart = () => {
+                    isRecording = true;
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    statusDiv.className = 'status recording';
+                    statusDiv.innerHTML = '<span class="pulse"></span> 録音中... マイクに向かって話してください';
+                };
+
+                recognition.onend = () => {
+                    isRecording = false;
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    statusDiv.className = 'status idle';
+                    statusDiv.innerHTML = '<span>📝</span> 録音を開始するには「録音開始」ボタンをクリックしてください';
+                    interimDiv.textContent = '';
+                };
+
+                recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript + ' ';
+                            transcriptDiv.textContent = finalTranscript;
+                            updateCharCount();
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+                    
+                    interimDiv.textContent = interimTranscript ? '認識中: ' + interimTranscript : '';
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    statusDiv.className = 'status error';
+                    
+                    let errorMessage = 'エラーが発生しました: ';
+                    switch(event.error) {
+                        case 'no-speech':
+                            errorMessage += '音声が検出されませんでした';
+                            break;
+                        case 'audio-capture':
+                            errorMessage += 'マイクが見つかりません';
+                            break;
+                        case 'not-allowed':
+                            errorMessage += 'マイクへのアクセスが拒否されました';
+                            break;
+                        default:
+                            errorMessage += event.error;
+                    }
+                    statusDiv.innerHTML = '<span>❌</span> ' + errorMessage;
+                    
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                };
+            }
+
+            // 文字数更新
+            function updateCharCount() {
+                charCountSpan.textContent = finalTranscript.length;
+            }
+
+            // イベントリスナー
+            startBtn.addEventListener('click', () => {
+                initRecognition();
+                recognition.start();
+            });
+
+            stopBtn.addEventListener('click', () => {
+                if (recognition) {
+                    recognition.stop();
+                }
+            });
+
+            clearBtn.addEventListener('click', () => {
+                finalTranscript = '';
+                transcriptDiv.textContent = '';
+                interimDiv.textContent = '';
+                updateCharCount();
+            });
+
+            copyBtn.addEventListener('click', () => {
+                if (finalTranscript) {
+                    navigator.clipboard.writeText(finalTranscript).then(() => {
+                        copyBtn.textContent = '✅ コピー完了！';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = '📋 コピー';
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('コピーに失敗しました:', err);
+                        alert('コピーに失敗しました');
+                    });
+                } else {
+                    alert('コピーする内容がありません');
+                }
+            });
+
+            downloadBtn.addEventListener('click', () => {
+                if (finalTranscript) {
+                    const blob = new Blob([finalTranscript], { type: 'text/plain;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `transcript_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } else {
+                    alert('ダウンロードする内容がありません');
+                }
+            });
+
+            languageSelect.addEventListener('change', () => {
+                if (isRecording && recognition) {
+                    recognition.stop();
+                    setTimeout(() => {
+                        initRecognition();
+                        recognition.start();
+                    }, 100);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
