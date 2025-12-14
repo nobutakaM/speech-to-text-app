@@ -507,6 +507,45 @@
             border-left: 3px solid var(--error);
         }
 
+        .toast.info {
+            border-left: 3px solid var(--accent);
+        }
+
+        /* Mode Selection */
+        .mode-selection {
+            margin-bottom: 1rem;
+        }
+
+        .mode-tabs {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.25rem;
+            border-radius: 10px;
+        }
+
+        .mode-tab {
+            flex: 1;
+            padding: 0.75rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .mode-tab.active {
+            background: var(--primary-gradient);
+            color: white;
+        }
+
+        .mode-tab:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .header h1 {
@@ -536,24 +575,53 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>リアルタイム音声文字起こし</h1>
-            <p>Web Speech APIを使用した高精度音声認識システム</p>
+            <h1>Gemini リアルタイム文字起こし</h1>
+            <p>Google Gemini APIとWeb Speech APIを使用した音声認識システム</p>
         </div>
 
-        <!-- Browser Compatibility Notice -->
+        <!-- API Key Setup -->
         <div class="setup-section">
             <h2 class="setup-title">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="8" x2="12" y2="12"/>
-                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    <rect x="3" y="11" width="18" height="10" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"/>
                 </svg>
-                ブラウザ対応状況
+                設定
             </h2>
-            <p class="setup-note">
-                このアプリケーションはWeb Speech APIを使用しています。<br>
-                最適な動作のため、<strong>Google Chrome</strong>または<strong>Microsoft Edge</strong>の最新版をご使用ください。
-            </p>
+            
+            <!-- Mode Selection -->
+            <div class="mode-selection">
+                <div class="mode-tabs">
+                    <button class="mode-tab active" onclick="setMode('webspeech')">Web Speech API (推奨)</button>
+                    <button class="mode-tab" onclick="setMode('gemini')">Gemini API</button>
+                </div>
+            </div>
+            
+            <div id="geminiSettings" style="display: none;">
+                <div class="api-key-input-wrapper">
+                    <input 
+                        type="password" 
+                        id="apiKey" 
+                        class="api-key-input" 
+                        placeholder="Gemini API Keyを入力してください"
+                    >
+                    <button class="api-key-toggle" onclick="toggleApiKeyVisibility()">
+                        <svg id="eyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </button>
+                </div>
+                <p class="setup-note">
+                    API Keyは <a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a> から取得できます
+                </p>
+            </div>
+            
+            <div id="webspeechSettings">
+                <p class="setup-note">
+                    Web Speech APIはブラウザの標準機能を使用します。Chrome、Edge、Safariで最適に動作します。
+                </p>
+            </div>
         </div>
 
         <!-- Control Panel -->
@@ -635,21 +703,46 @@
         let analyser;
         let microphone;
         let javascriptNode;
+        let currentMode = 'webspeech';
+        let recognition;
 
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            // Check for browser compatibility
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                showToast('お使いのブラウザは音声録音に対応していません', 'error');
-                document.getElementById('startBtn').disabled = true;
-            }
+        // Set recognition mode
+        function setMode(mode) {
+            currentMode = mode;
+            const tabs = document.querySelectorAll('.mode-tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
             
-            // Check for Web Speech API support
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                showToast('お使いのブラウザは音声認識に対応していません。ChromeまたはEdgeをご使用ください。', 'error');
-                document.getElementById('startBtn').disabled = true;
+            if (mode === 'gemini') {
+                document.getElementById('geminiSettings').style.display = 'block';
+                document.getElementById('webspeechSettings').style.display = 'none';
+            } else {
+                document.getElementById('geminiSettings').style.display = 'none';
+                document.getElementById('webspeechSettings').style.display = 'block';
             }
-        });
+        }
+
+        // Toggle API Key visibility
+        function toggleApiKeyVisibility() {
+            const apiKeyInput = document.getElementById('apiKey');
+            const eyeIcon = document.getElementById('eyeIcon');
+            
+            if (apiKeyInput.type === 'password') {
+                apiKeyInput.type = 'text';
+                eyeIcon.innerHTML = `
+                    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                `;
+            } else {
+                apiKeyInput.type = 'password';
+                eyeIcon.innerHTML = `
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                `;
+            }
+        }
+
+        // Audio visualizer
         function startVisualizer() {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
@@ -689,29 +782,33 @@
 
         // Start recording
         async function startRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                // Check for Web Speech API support
-                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                    isRecording = true;
-                    
-                    // Update UI
-                    document.getElementById('startBtn').disabled = true;
-                    document.getElementById('stopBtn').disabled = false;
-                    document.getElementById('statusIndicator').classList.add('active');
-                    document.getElementById('statusText').textContent = '音声認識を開始中...';
-                    document.getElementById('audioVisualizer').style.display = 'flex';
-                    
-                    startVisualizer();
-                    showToast('音声認識を開始しました', 'success');
-                    
-                    // Start Web Speech Recognition
-                    startWebSpeechRecognition();
-                } else {
-                    showToast('お使いのブラウザは音声認識に対応していません。ChromeまたはEdgeをご使用ください。', 'error');
+            if (currentMode === 'gemini') {
+                const apiKey = document.getElementById('apiKey').value;
+                if (!apiKey) {
+                    showToast('APIキーを入力してください', 'error');
                     return;
                 }
+            }
+
+            try {
+                if (currentMode === 'webspeech') {
+                    // Use Web Speech API
+                    startWebSpeechRecognition();
+                } else {
+                    // Use Gemini API with MediaRecorder
+                    startGeminiRecording();
+                }
+                
+                isRecording = true;
+                
+                // Update UI
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('statusIndicator').classList.add('active');
+                document.getElementById('audioVisualizer').style.display = 'flex';
+                
+                startVisualizer();
+                showToast('録音を開始しました', 'success');
                 
             } catch (error) {
                 console.error('Error starting recording:', error);
@@ -719,148 +816,220 @@
             }
         }
 
-        // Stop recording
-        function stopRecording() {
-            if (isRecording) {
-                isRecording = false;
-                
-                // Stop speech recognition
-                if (recognition) {
-                    recognition.stop();
-                }
-                
-                // Update UI
-                document.getElementById('startBtn').disabled = false;
-                document.getElementById('stopBtn').disabled = true;
-                document.getElementById('statusIndicator').classList.remove('active');
-                document.getElementById('statusText').textContent = '処理中...';
-                document.getElementById('audioVisualizer').style.display = 'none';
-                
-                if (javascriptNode) {
-                    javascriptNode.disconnect();
-                }
-                if (microphone) {
-                    microphone.disconnect();
-                }
-                if (audioContext) {
-                    audioContext.close();
-                }
-                
-                // Update transcription with final results
-                if (finalTranscript) {
-                    transcriptionText = finalTranscript;
-                    document.getElementById('statusText').textContent = '完了';
-                }
-                
-                showToast('音声認識を停止しました', 'success');
+        // Start Gemini recording
+        async function startGeminiRecording() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            // Try to use webm format first, fallback to others if not supported
+            const mimeTypes = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg;codecs=opus',
+                'audio/mp4',
+            ];
+            
+            let selectedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+            
+            if (!selectedMimeType) {
+                throw new Error('No suitable audio format supported');
             }
+            
+            mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType });
+            audioChunks = [];
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+            
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: selectedMimeType });
+                await transcribeWithGemini(audioBlob, selectedMimeType);
+            };
+            
+            mediaRecorder.start();
+            document.getElementById('statusText').textContent = '録音中...';
         }
 
-        // Transcribe audio using Gemini API
-        async function transcribeAudio(audioBlob, isPartial = false) {
+        // Web Speech API recognition
+        function startWebSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                showToast('お使いのブラウザはWeb Speech APIに対応していません', 'error');
+                currentMode = 'gemini';
+                setMode('gemini');
+                return;
+            }
+            
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            
+            recognition.onstart = () => {
+                console.log('Speech recognition started');
+                document.getElementById('statusText').textContent = '音声認識中...';
+            };
+            
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                        updateTranscriptionDisplay(transcript, false);
+                        transcriptionText += transcript + ' ';
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                
+                if (interimTranscript) {
+                    document.getElementById('statusText').textContent = '認識中: ' + interimTranscript.substring(0, 30) + '...';
+                }
+            };
+            
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                if (event.error === 'no-speech') {
+                    showToast('音声が検出されませんでした', 'info');
+                } else if (event.error === 'not-allowed') {
+                    showToast('マイクへのアクセスが拒否されました', 'error');
+                } else {
+                    showToast('音声認識エラー: ' + event.error, 'error');
+                }
+            };
+            
+            recognition.onend = () => {
+                console.log('Speech recognition ended');
+                if (isRecording) {
+                    // Restart recognition if still recording
+                    recognition.start();
+                }
+            };
+            
+            recognition.start();
+        }
+
+        // Transcribe with Gemini API
+        async function transcribeWithGemini(audioBlob, mimeType) {
             const apiKey = document.getElementById('apiKey').value;
             
+            if (!apiKey) {
+                showToast('APIキーが設定されていません', 'error');
+                document.getElementById('statusText').textContent = 'エラー';
+                return;
+            }
+            
+            document.getElementById('statusText').textContent = '文字起こし中...';
+            
             try {
-                // Convert audio blob to base64
+                // Convert blob to base64
                 const reader = new FileReader();
                 reader.readAsDataURL(audioBlob);
                 
                 reader.onloadend = async () => {
                     const base64Audio = reader.result.split(',')[1];
                     
-                    try {
-                        // Note: Gemini 1.5 Flash doesn't support direct audio transcription
-                        // We need to use Gemini 1.5 Pro or convert to a supported format
-                        // For now, let's use a simpler text generation approach
-                        
-                        // Alternative: Use Web Speech API for transcription
-                        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                            // Use Web Speech API instead
-                            startWebSpeechRecognition();
-                            return;
+                    const requestBody = {
+                        contents: [{
+                            parts: [
+                                {
+                                    text: "この音声の内容を正確に日本語で文字起こししてください。話者の発言をそのまま記録してください。"
+                                },
+                                {
+                                    inline_data: {
+                                        mime_type: mimeType,
+                                        data: base64Audio
+                                    }
+                                }
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            topK: 1,
+                            topP: 0.95,
+                            maxOutputTokens: 8192,
                         }
+                    };
+                    
+                    const response = await fetch(
+                        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(requestBody)
+                        }
+                    );
+                    
+                    if (!response.ok) {
+                        const errorData = await response.text();
+                        console.error('API Error Response:', errorData);
+                        throw new Error(`API Error: ${response.status} - ${errorData}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+                        const transcribedText = data.candidates[0].content.parts[0].text;
                         
-                        // If Web Speech API is not available, show error
-                        showToast('音声認識APIが利用できません。ChromeまたはEdgeブラウザをご使用ください。', 'error');
-                        document.getElementById('statusText').textContent = '非対応';
-                        
-                        
-                    } catch (error) {
-                        console.error('Transcription error:', error);
-                        showToast('文字起こしエラー: ' + error.message, 'error');
-                        document.getElementById('statusText').textContent = 'エラー';
+                        if (transcribedText && transcribedText.trim()) {
+                            transcriptionText += transcribedText + ' ';
+                            updateTranscriptionDisplay(transcribedText, false);
+                            document.getElementById('statusText').textContent = '完了';
+                        } else {
+                            showToast('文字起こし結果が空でした', 'info');
+                            document.getElementById('statusText').textContent = '待機中';
+                        }
+                    } else {
+                        throw new Error('Invalid API response structure');
                     }
                 };
             } catch (error) {
-                console.error('File reading error:', error);
-                showToast('ファイル読み込みエラー', 'error');
+                console.error('Transcription error:', error);
+                showToast('文字起こしエラー: ' + error.message, 'error');
+                document.getElementById('statusText').textContent = 'エラー';
             }
         }
 
-        // Web Speech API for transcription
-        let recognition;
-        let finalTranscript = '';
-        let interimTranscript = '';
-
-        function startWebSpeechRecognition() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        // Stop recording
+        function stopRecording() {
+            if (!isRecording) return;
             
-            if (!recognition) {
-                recognition = new SpeechRecognition();
-                recognition.lang = 'ja-JP';
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                
-                recognition.onstart = () => {
-                    console.log('Speech recognition started');
-                    document.getElementById('statusText').textContent = '音声認識中...';
-                };
-                
-                recognition.onresult = (event) => {
-                    interimTranscript = '';
-                    
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        const transcript = event.results[i][0].transcript;
-                        
-                        if (event.results[i].isFinal) {
-                            finalTranscript += transcript + ' ';
-                            updateTranscriptionDisplay(transcript, false);
-                        } else {
-                            interimTranscript += transcript;
-                        }
-                    }
-                    
-                    if (interimTranscript) {
-                        // Show interim results in a different style if needed
-                        document.getElementById('statusText').textContent = '認識中: ' + interimTranscript.substring(0, 30) + '...';
-                    }
-                };
-                
-                recognition.onerror = (event) => {
-                    console.error('Speech recognition error:', event.error);
-                    if (event.error === 'no-speech') {
-                        showToast('音声が検出されませんでした', 'error');
-                    } else {
-                        showToast('音声認識エラー: ' + event.error, 'error');
-                    }
-                };
-                
-                recognition.onend = () => {
-                    console.log('Speech recognition ended');
-                    if (isRecording) {
-                        // Restart if still recording
-                        recognition.start();
-                    } else {
-                        document.getElementById('statusText').textContent = '完了';
-                    }
-                };
+            isRecording = false;
+            
+            if (currentMode === 'webspeech' && recognition) {
+                recognition.stop();
+            } else if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
             }
             
-            try {
-                recognition.start();
-            } catch (error) {
-                console.error('Recognition start error:', error);
+            // Update UI
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('statusIndicator').classList.remove('active');
+            document.getElementById('statusText').textContent = '処理完了';
+            document.getElementById('audioVisualizer').style.display = 'none';
+            
+            if (javascriptNode) {
+                javascriptNode.disconnect();
             }
+            if (microphone) {
+                microphone.disconnect();
+            }
+            if (audioContext) {
+                audioContext.close();
+            }
+            
+            showToast('録音を停止しました', 'success');
         }
 
         // Update transcription display
@@ -875,12 +1044,7 @@
             segment.className = 'transcription-segment';
             segment.textContent = text;
             
-            if (isPartial) {
-                contentDiv.appendChild(segment);
-            } else {
-                contentDiv.innerHTML = '';
-                contentDiv.appendChild(segment);
-            }
+            contentDiv.appendChild(segment);
             
             // Auto scroll to bottom
             contentDiv.scrollTop = contentDiv.scrollHeight;
@@ -958,6 +1122,24 @@
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 showToast('お使いのブラウザは音声録音に対応していません', 'error');
                 document.getElementById('startBtn').disabled = true;
+            }
+            
+            // Load saved API key if exists
+            const savedApiKey = localStorage.getItem('geminiApiKey');
+            if (savedApiKey) {
+                document.getElementById('apiKey').value = savedApiKey;
+            }
+            
+            // Save API key on input
+            document.getElementById('apiKey').addEventListener('input', (e) => {
+                localStorage.setItem('geminiApiKey', e.target.value);
+            });
+            
+            // Check Web Speech API support
+            if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+                currentMode = 'gemini';
+                document.querySelector('.mode-tab[onclick*="gemini"]').click();
+                showToast('Web Speech APIがサポートされていないため、Gemini APIモードを使用します', 'info');
             }
         });
     </script>
