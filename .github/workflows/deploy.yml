@@ -1,4 +1,4 @@
-name: Deploy (Frontend: Shared, Backend: VPS)
+name: Deploy (Frontend Shared, Backend VPS)
 
 on:
   push:
@@ -32,9 +32,9 @@ jobs:
       - name: Install SSH key (Shared)
         uses: shimataro/ssh-key-action@v2
         with:
-          key: ${{ secrets.SHARED_SSH_KEY }}
+          key: ${{ secrets.SAKURA_SSH_KEY }}
           name: id_rsa_shared
-          known_hosts: ${{ secrets.SHARED_KNOWN_HOSTS }}
+          known_hosts: ${{ secrets.SAKURA_KNOWN_HOSTS }}
 
       # VPS用の鍵を ~/.ssh/id_rsa_vps に入れる
       - name: Install SSH key (VPS)
@@ -52,8 +52,8 @@ jobs:
           mkdir -p ~/.ssh
           cat >> ~/.ssh/config << 'EOF'
           Host shared
-            HostName ${SHARED_HOST}
-            User ${SHARED_USER}
+            HostName ${SAKURA_HOST}
+            User ${SAKURA_USER}
             IdentityFile ~/.ssh/id_rsa_shared
             IdentitiesOnly yes
 
@@ -65,15 +65,15 @@ jobs:
           EOF
 
           # 変数を埋め込み（安全に置換）
-          perl -pi -e 's/\$\{SHARED_HOST\}/$ENV{SHARED_HOST}/g' ~/.ssh/config
-          perl -pi -e 's/\$\{SHARED_USER\}/$ENV{SHARED_USER}/g' ~/.ssh/config
+          perl -pi -e 's/\$\{SAKURA_HOST\}/$ENV{SAKURA_HOST}/g' ~/.ssh/config
+          perl -pi -e 's/\$\{SAKURA_USER\}/$ENV{SAKURA_USER}/g' ~/.ssh/config
           perl -pi -e 's/\$\{VPS_HOST\}/$ENV{VPS_HOST}/g' ~/.ssh/config
           perl -pi -e 's/\$\{VPS_USER\}/$ENV{VPS_USER}/g' ~/.ssh/config
 
           chmod 600 ~/.ssh/config
         env:
-          SHARED_HOST: ${{ secrets.SHARED_HOST }}
-          SHARED_USER: ${{ secrets.SHARED_USER }}
+          SAKURA_HOST: ${{ secrets.SAKURA_HOST }}
+          SAKURA_USER: ${{ secrets.SAKURA_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
 
@@ -82,7 +82,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rsync -avz --delete dist/ shared:${{ secrets.SHARED_WEB_ROOT }}
+          rsync -avz --delete dist/ shared:${{ secrets.SAKURA_WEB_ROOT }}
 
       # --- Backend deploy to VPS (git pull + npm ci + pm2 reload) ---
       - name: Deploy backend to VPS (git pull + pm2 reload)
