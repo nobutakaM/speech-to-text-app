@@ -1,0 +1,94 @@
+name: Deploy (Frontend to Sakura Shared, Backend to VPS)
+
+on:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: deploy-split
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # ===== Frontend build (Vite) =====
+      - name: Install deps
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      # ===== Setup SSH keys for both servers =====
+      - name: Setup SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+
+          # Shared (frontend)
+          echo "${{ secrets.SHARED_SSH_KEY }}" > ~/.ssh/id_rsa_shared
+          chmod 600 ~/.ssh/id_rsa_shared
+          ssh-keyscan -H "${{ secrets.SHARED_HOST }}" >> ~/.ssh/known_hosts
+
+          # VPS (backend)
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa_vps
+          chmod 600 ~/.ssh/id_rsa_vps
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      # ===== Deploy Frontend to Sakura shared hosting via rsync =====
+      - name: Deploy frontend to Shared Server (rsync dist/)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_rsa_shared" \
+            dist/ \
+            ${{ secrets.SHARED_USER }}@${{ secrets.SHARED_HOST }}:${{ secrets.SHARED_WEB_ROOT }}
+
+      # ===== Deploy Backend to VPS (git pull + pm2 reload) =====
+      - name: Deploy backend to VPS (git pull + npm ci + pm2 reload)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_rsa_vps ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            set -euo pipefail
+
+            APP_DIR="${APP_DIR:-/opt/transcriber-api}"
+            BRANCH="${BRANCH:-main}"
+            PM2_NAME="${PM2_NAME:-transcriber-api}"
+
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "ERROR: $APP_DIR is not a git repo on VPS. Clone it first." >&2
+              exit 1
+            fi
+
+            cd "$APP_DIR"
+            git fetch --all --prune
+            git checkout "$BRANCH"
+            git pull --ff-only origin "$BRANCH"
+
+            # backendがサブディレクトリの場合はここを有効化して調整
+            # cd server
+
+            npm ci --omit=dev
+
+            if command -v pm2 >/dev/null 2>&1; then
+              pm2 describe "$PM2_NAME" >/dev/null 2>&1 && pm2 reload "$PM2_NAME" || pm2 start server.js --name "$PM2_NAME"
+              pm2 save
+            else
+              echo "ERROR: pm2 is not installed on VPS." >&2
+              exit 1
+            fi
+          EOF
