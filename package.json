@@ -1,0 +1,21 @@
+{
+  "name": "gemini-live-realtime-transcriber",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "npm-run-all -p dev:server dev:client",
+    "dev:client": "npm --workspace client run dev -- --host 127.0.0.1 --port 5173",
+    "dev:server": "npm --workspace server run dev",
+    "build": "npm --workspace client run build",
+    "test": "npm --workspace client run test",
+    "test:e2e": "playwright test",
+    "lint": "echo \"(optional) add lint\""
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "npm-run-all": "^4.1.5"
+  }
+}
